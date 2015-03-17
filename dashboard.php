@@ -33,7 +33,7 @@
 			var field = $(this),
 			sourceText = field.text(),
 			nodeName = field.parent().find('.node-name').text(),
-			fileName =  "/usr/jails/var/db/nodedescr/tmp." + nodeName + '.' +field.data('file'),
+			fileName =  "/usr/jails/var/db/nodedescr/" + nodeName + '.' +field.data('file'),
 			editor = $('#editor');
 
 			postData = {
@@ -101,8 +101,8 @@
 </script>
 </head>
 <body>
-<a href="javascript:location.reload(true)">Refresh Page </a> | <a href="addnode.php">Add Node</a>
-
+<a href="javascript:location.reload(true)">[ Refresh Page ]</a>
+<br>
 <?php
 function fetch_node_inv($dbfilepath)
 {
@@ -124,7 +124,6 @@ function fetch_node_inv($dbfilepath)
 	}
 
 	$db = new SQLite3($dbfilepath); $db->busyTimeout(5000);
-
 	$results = $db->query('SELECT COUNT(*) FROM jails;');
 
 	if (!($results instanceof Sqlite3Result)) {
@@ -149,7 +148,7 @@ function fetch_node_inv($dbfilepath)
 		}
 	}
 
-	$netres = $db->query('SELECT * FROM gw;');
+	$netres = $db->query('select * from gw;');
 
 	if (!($netres instanceof Sqlite3Result)) {
 	} else {
@@ -201,15 +200,8 @@ EOF;
 				fclose($fp);
 			}
 
-			$idle=check_locktime($nodeip);
-			
-			if ($idle == 0 ) {
-				$hdr = '<tr rel="${nodename}" style="background-color:#D6D2D0">';
-			} else {
-				$hdr = '<tr rel="${nodename}">';
-			}
 			$nodetable .=<<<EOF
-			$hdr
+			<tr rel="{$nodename}">
 				<td bgcolor="#CCFFCC" class="node-name" data-file="descr" data-type="text">$nodename</td>
 				<td data-togle="toolkip" title="$gwinfo">$nodeip</td>
 				<td class="edited" data-file="descr" data-type="textarea">$desc</td>
@@ -237,7 +229,7 @@ $db->close();
 /// MAIN
 require('cbsd.php');
 require('nodes.inc.php');
-
+echo "<strong>Summary statistics for the CBSD farm:</strong>";
 if (!extension_loaded('sqlite3')) {
 	if (!dl('sqlite3.so')) {
 		echo "No such sqlite3 extension";
@@ -252,9 +244,10 @@ $allnodes=0;
 $nodetable="";
 $alljails=0;
 $knownfreq=0;
+$offlinenodes=0;
 
 $db = new SQLite3("$workdir/var/db/nodes.sqlite"); $db->busyTimeout(5000);
-$sql = "SELECT nodename FROM nodelist";
+$sql = "SELECT nodename,ip FROM nodelist";
 $result = $db->query($sql);//->fetchArray(SQLITE3_ASSOC);
 $row = array();
 $i = 0;
@@ -262,12 +255,27 @@ $i = 0;
 while($res = $result->fetchArray(SQLITE3_ASSOC)){
 	if(!isset($res['nodename'])) continue;
 	$nodename = $res['nodename'];
+	$nodeip = $res['ip'];
 	++$allnodes;
 	$path=$workdir."/var/db/";
 	$postfix=".sqlite";
 	$dbpath=$path.chop($nodename).$postfix;
+	
+	$idle=check_locktime($nodeip);
+	
+	if ( $idle == 0 ) {
+		$offlinenodes++;
+	}
+	
 	fetch_node_inv($dbpath);
 }
+
+if ( $offlinenodes == 0 ) {
+	$offlinecolor="#FFFF99";
+} else { 
+	$offlinecolor="#FF9B77";
+}
+
 
 if ( $knownfreq > 0 ) {
 	$avgfreq=round($allcpufreq / $knownfreq);
@@ -275,25 +283,37 @@ if ( $knownfreq > 0 ) {
 	$avgfreq=0;
 }
 
+$outstr=<<<EOF
+<table border=1>
+<tr>
+	<td bgcolor="#00FF00">Num of nodes:</td><td bgcolor="#FFFF99">$allnodes</td>
+</tr>
+<tr>
+	<td bgcolor="#00FF00">Online nodes:</td><td bgcolor="#FFFF99">$allnodes</td>
+</tr>
+<tr>
+	<td bgcolor="$offlinecolor">Offline nodes:</td><td bgcolor="$offlinecolor">$offlinenodes</td>
+</tr>
+<tr>
+	<td bgcolor="#00FF00">Num of jails:</td><td bgcolor="#FFFF99">$alljails</td>
+</tr>
+<tr>
+	<td bgcolor="#00FF00">Num of core:</td><td bgcolor="#FFFF99">$allncpu</td>
+</tr>
+<tr>
+	<td bgcolor="#00FF00">Average freq. Mhz:</td><td bgcolor="#FFFF99">$avgfreq</td>
+</tr>
+<tr>
+	<td bgcolor="#00FF00">Summary RAM:</td><td bgcolor="#FFFF99">$allphysmem</td>
+</tr>
+<tr>
+	<td bgcolor="#00FF00">Summary Storage:</td><td bgcolor="#FFFF99">Unknown</td>
+</tr>
+EOF;
+
+echo $outstr;
 ?>
 </table>
 <br>
-<table border=1>
-	<tr bgcolor="#CCFFCC">
-		<td>Nodename</td>
-		<td>Main IP</td>
-		<td>Descr</td>
-		<td>Location</td>
-		<td>Sys</td>
-		<td>FS</td>
-		<td>Memory</td>
-		<td>CPU</td>
-		<td>Mhz</td>
-		<td>Jails</td>
-		<td>Notes</td>
-	</tr>
-<?php
-	echo $nodetable
-?>
 </table>
 </html>

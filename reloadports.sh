@@ -1,6 +1,8 @@
 #!/bin/sh
 
+
 list=$( cbsd service mode=list baseonly=1 )
+
 
 echo "<form action="">"
 echo "<div class="field">"
@@ -11,4 +13,3 @@ done
 
 echo "</div>"
 echo "</form>"
-
